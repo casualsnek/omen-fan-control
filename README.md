@@ -2,17 +2,19 @@
 
 This tool provides fan control for HP Omen Max, Victus and Omen laptops on Linux. It includes installer for a kernel driver patch (`hp-wmi`) to expose PWM controls and a userspace utility to manage fan curves, create watchdog that sets the fan configuration periodically and a simple stress test tool to see the fan curve in effect.
 
-## Context: Linux Kernel 6.20+
+## Context
 
-Linux 6.20+ introduces native fan control support for some devices from the following models:
+This tool includes a backported `hp-wmi` driver patch from the upcoming Linux 6.20 kernel, which introduces native fan control support for many devices from the following models:
 1.  **HP Omen Max**
 2.  **HP Victus**
 3.  **HP Omen**
 
+The patch can be installed on versions before `6.20`.
+
 **Reference Kernel Commit:**
 [platform/x86: hp-wmi: add manual fan control for Victus S models](https://git.kernel.org/pub/scm/linux/kernel/git/pdx86/platform-drivers-x86.git/commit/?h=for-next&id=46be1453e6e61884b4840a768d1e8ffaf01a4c1c)
 
-This program includes a patched version that sets the max speed according to the calibration if the query to get the max RPM fails for your device.
+This program also includes a modification that sets the max speed according to calibration if the query to get the Max RPM fails for your device.
 ## Tested Hardware
 
 *   **Model:** HP OMEN MAX 16-AH0001NT (8D41)
