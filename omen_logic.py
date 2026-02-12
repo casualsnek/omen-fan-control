@@ -221,7 +221,10 @@ class FanController:
     def get_fan_speed(self):
         """Returns current fan speed in RPM."""
         val = self.read_sys_file(self.fan1_input_path)
-        return int(val) if val else 0
+        if not val:
+            print("Failed to read fan speed")
+            return 0
+        return int(val)
 
     def get_cpu_temp(self):
         """Returns CPU temp in Celsius."""

@@ -1039,6 +1039,17 @@ class MainWindow(QMainWindow):
         self.manual_unsaved_lbl.setVisible(False)
         self.curve_unsaved_lbl.setVisible(False)
         
+        self.manual_unsaved_lbl.setVisible(False)
+        self.curve_unsaved_lbl.setVisible(False)
+        
+        # If service is running, we just save config and let service handle it
+        if self.controller.is_service_running():
+            self.status_label.setText(f"Settings saved. Service will apply {mode} mode.")
+            # Ensure local loop is stopped
+            if hasattr(self, 'curve_timer'):
+                self.curve_timer.stop()
+            return
+
         if mode == "auto":
             self.controller.set_fan_mode("auto")
             self.status_label.setText("Set mode to Auto")
@@ -1066,6 +1077,11 @@ class MainWindow(QMainWindow):
             self.curve_timer = QTimer()
             self.curve_timer.timeout.connect(self.apply_curve_step)
         
+        # If service is running, do not run local loop
+        if self.controller.is_service_running():
+            self.curve_timer.stop()
+            return
+
         if self.mode_combo.currentText() == "Curve":
             self.curve_timer.start(2000)
         else:
@@ -1278,9 +1294,17 @@ class MainWindow(QMainWindow):
             if running:
                 self.svc_status_label.setText("Service: Active")
                 self.svc_status_label.setStyleSheet("color: #4caf50; font-weight: bold;") # Green
+                
+                # Stop local loop if service is running
+                if hasattr(self, 'curve_timer') and self.curve_timer.isActive():
+                    self.curve_timer.stop()
             else:
                 self.svc_status_label.setText("Service: Inactive")
                 self.svc_status_label.setStyleSheet("color: #ff9800; font-weight: bold;") # Orange
+                
+                # Resume local loop if in Curve mode and service is not running
+                if self.mode_combo.currentText() == "Curve":
+                     self.start_curve_loop()
 
     def toggle_stress_test(self, checked):
         if checked:
