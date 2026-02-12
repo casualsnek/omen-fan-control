@@ -45,6 +45,22 @@ def cli(ctx, config, help_extra):
         click.echo(click.style("Use --bypass-root-warning in 'omen_cli.py options' config to hide this.", dim=True))
         click.echo("", err=True)
 
+    # Board support check
+    if not controller.config.get("bypass_warning", False):
+        status, board = controller.check_board_support()
+        if status == "UNSUPPORTED":
+             click.echo(click.style(f"WARNING: Your board '{board}' is not in the known compatible list.", fg="red"))
+             click.echo(click.style("Using this tool could potentially cause system instability.", fg="red"))
+             click.echo("To bypass this warning, set 'bypass_warning' to true in config or toggle in GUI.")
+
+             
+        elif status == "POSSIBLY_SUPPORTED" and not controller.config.get("enable_experimental", False):
+             click.echo(click.style(f"NOTE: Your board '{board}' is valid for experimental support.", fg="yellow"))
+             click.echo(click.style("Community patches suggest it uses the Omen thermal path.", fg="yellow"))
+             click.echo("You can enable experimental support in the GUI Settings or by editing config.json:")
+             click.echo('  "enable_experimental": true, "thermal_profile": "omen" (or victus/victus_s)')
+             click.echo("")
+
 def get_controller():
     ctx = click.get_current_context()
     config_path = ctx.obj.get('config_path') if ctx.obj else None
@@ -433,7 +449,9 @@ def stress(duration):
 @click.option('--ma-window', type=int, required=False, is_flag=False, flag_value=-1, help="Moving Average Window size. No arg shows current.")
 @click.option('--bypass-warning', type=click.Choice(['on', 'off']), required=False, is_flag=False, flag_value='show', help="Bypass driver patch warning. No arg shows current.")
 @click.option('--curve-interpolation', type=click.Choice(['smooth', 'discrete']), required=False, is_flag=False, flag_value='show', help="Curve interpolation mode. No arg shows current.")
-def options(wait_time, watchdog, ma_window, bypass_warning, curve_interpolation):
+@click.option('--enable-experimental', type=click.Choice(['on', 'off']), required=False, is_flag=False, flag_value='show', help="Enable experimental board support. No arg shows current.")
+@click.option('--thermal-profile', type=click.Choice(['omen', 'victus', 'victus_s']), required=False, is_flag=False, flag_value='show', help="Set thermal profile for exp. support. No arg shows current.")
+def options(wait_time, watchdog, ma_window, bypass_warning, curve_interpolation, enable_experimental, thermal_profile):
     """
     Configure or view options.
     Run without arguments to view all current settings.
@@ -448,6 +466,8 @@ def options(wait_time, watchdog, ma_window, bypass_warning, curve_interpolation)
         mw = controller.config.get('ma_window', 5)
         bp = controller.config.get('bypass_patch_warning', False)
         ci = controller.config.get('curve_interpolation', 'smooth')
+        ee = controller.config.get('enable_experimental', False)
+        tp = controller.config.get('thermal_profile', 'omen')
         
         click.echo("Current Configuration:")
         click.echo(f"  Calibration Wait Time: {wt}s \t--wait-time")
@@ -455,6 +475,8 @@ def options(wait_time, watchdog, ma_window, bypass_warning, curve_interpolation)
         click.echo(f"  MA Window (Smoothing): {mw}  \t--ma-window")
         click.echo(f"  Bypass Warning:        {'On' if bp else 'Off'} \t--bypass-warning")
         click.echo(f"  Curve Interpolation:   {ci} \t--curve-interpolation")
+        click.echo(f"  Experimental Support:  {'On' if ee else 'Off'} \t--enable-experimental")
+        click.echo(f"  Thermal Profile:       {tp} \t--thermal-profile")
         return
 
     changed = False
@@ -501,6 +523,25 @@ def options(wait_time, watchdog, ma_window, bypass_warning, curve_interpolation)
             controller.config['bypass_patch_warning'] = is_on
             changed = True
             click.echo(f"Bypass Warning set to {'On' if is_on else 'Off'}")
+
+    if enable_experimental is not None:
+        if enable_experimental == 'show':
+             val = controller.config.get('enable_experimental', False)
+             click.echo(f"Current Experimental Support: {'On' if val else 'Off'}")
+        else:
+             is_on = (enable_experimental == 'on')
+             controller.config['enable_experimental'] = is_on
+             changed = True
+             click.echo(f"Experimental Support set to {'On' if is_on else 'Off'}")
+
+    if thermal_profile is not None:
+        if thermal_profile == 'show':
+             val = controller.config.get('thermal_profile', 'omen')
+             click.echo(f"Current Thermal Profile: {val}")
+        else:
+             controller.config['thermal_profile'] = thermal_profile
+             changed = True
+             click.echo(f"Thermal Profile set to {thermal_profile}")
 
     if curve_interpolation is not None:
         if curve_interpolation == 'show':

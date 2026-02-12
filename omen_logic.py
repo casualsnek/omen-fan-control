@@ -55,6 +55,21 @@ SUPPORTED_BOARDS = {
     "8BBE", "8BD4", "8BD5", "8C78", "8C99", "8C9C", "8D41"
 }
 
+POSSIBLY_SUPPPORTED_OMEN_BOARDS = {
+    "84DA", "84DB", "84DC", "8574", "8575", "860A", "87B5", "8572", "8573",
+ 	"8600", "8601", "8602", "8605", "8606", "8607", "8746", "8747", "8749",
+ 	"874A", "8603", "8604", "8748", "886B", "886C", "878A", "878B", "878C",
+ 	"88C8", "88CB", "8786", "8787", "8788", "88D1", "88D2", "88F4", "88FD",
+	"88F5", "88F6", "8A13", "8A14", "8A15", "8A16", "88F7", "88FE", "8A17",
+	"8A18", "8A19", "8A1A", "8BAD", "8BB0", "88FF", "8900", "8901", "8902",
+	"8912", "8917", "8918", "8A97", "8A96", "8D2C", "8949", "8A98", "894A",
+	"8B1D", "89EB", "8A4C", "8A4D", "8A4E", "8A40", "8A41", "8A42", "8A43",
+	"8A44", "8BA8", "8BA9", "8BAA", "8BAB", "8BAC", "8C76", "8C77", "8C78",
+	"8BCA", "8BCB", "8BCD", "8BCF", "8C9B", "8BB3", "8BB4", "8C4D", "8C4E",
+	"8C58", "8C75", "8C74", "8C73", "8CC1", "8CC0", "8CF1", "8CF2", "8CF3",
+	"8CF4"
+}
+
 class FanController:
     def __init__(self, config_path=None):
         self._find_paths()
@@ -68,16 +83,30 @@ class FanController:
     def check_board_support(self):
         """
         Checks if the current board is in the supported list.
-        Returns (is_supported, board_name)
+        Returns (status, board_name)
+        status: "SUPPORTED", "POSSIBLY_SUPPORTED", "UNSUPPORTED"
         """
-        try:
-            with open("/sys/class/dmi/id/board_name", "r") as f:
-                board_name = f.read().strip()
-            
-            return board_name in SUPPORTED_BOARDS, board_name
-        except Exception as e:
-            print(f"Error reading board name: {e}")
-            return False, "Unknown"
+        # Return cached if available
+        if self.config.get("cached_board_name"):
+            board_name = self.config["cached_board_name"]
+        else:
+            try:
+                with open("/sys/class/dmi/id/board_name", "r") as f:
+                    board_name = f.read().strip()
+                
+                self.config["cached_board_name"] = board_name
+                self.save_config()
+                
+            except Exception as e:
+                print(f"Error reading board name: {e}")
+                return "UNSUPPORTED", "Unknown"
+
+        if board_name in SUPPORTED_BOARDS:
+            return "SUPPORTED", board_name
+        elif board_name in POSSIBLY_SUPPPORTED_OMEN_BOARDS:
+            return "POSSIBLY_SUPPORTED", board_name
+        else:
+            return "UNSUPPORTED", board_name
 
     def _find_paths(self):
         """Finds the correct hwmon paths for fan control."""
@@ -135,7 +164,11 @@ class FanController:
             "mode": "auto",
             "manual_pwm": 0,
             "curve_interpolation": "smooth",
-            "bypass_root_warning": False
+            "bypass_root_warning": False,
+            "enable_experimental": False,
+            "thermal_profile": "omen",
+            "cached_board_name": None,
+            "debug_experimental_ui": True
         }
         
         if not self.config_path.exists():
@@ -327,7 +360,7 @@ class FanController:
         return max_rpm
 
     def _patch_driver_source(self, fan_max):
-        """Patches hp-wmi.c with the max rpm value."""
+        """Patches hp-wmi.c with the max rpm value and experimental boards if enabled."""
         orig_file = OMEN_FAN_DIR / "hp-wmi.c.orig"
         target_file = OMEN_FAN_DIR / "hp-wmi.c"
         
@@ -341,14 +374,45 @@ class FanController:
         with open(orig_file, "r") as f:
             content = f.read()
 
-        # Replace define
+        # 1. Patch Max RPM
         max_rpm_val = math.floor(fan_max / 100)
         new_define = f"#define OMEN_MAX_RPM {max_rpm_val}"
+        content = content.replace("#define OMEN_MAX_RPM 60", new_define)
         
-        new_content = content.replace("#define OMEN_MAX_RPM 60", new_define)
-        
+        # 2. Patch Experimental Support if enabled
+        if self.config.get("enable_experimental", False):
+            board_name = self.config.get("cached_board_name")
+            if not board_name:
+                 # Try to get it if not cached
+                 _, board_name = self.check_board_support()
+            
+            if board_name and board_name != "Unknown":
+                profile = self.config.get("thermal_profile", "omen")
+                
+                target_array = "omen_thermal_profile_boards"
+                if profile == "victus":
+                    target_array = "victus_thermal_profile_boards"
+                elif profile == "victus_s":
+                    target_array = "victus_s_thermal_profile_boards"
+                           
+                start_idx = content.find(f"{target_array}[] = {{")
+                if start_idx != -1:
+                    # Find closing brace after start_idx
+                    end_idx = content.find("};", start_idx)
+                    if end_idx != -1:
+                         # Check if board is already in there
+                         segment = content[start_idx:end_idx]
+                         if f'"{board_name}"' not in segment:
+
+                             insertion = f'\t"{board_name}",\n'
+                             content = content[:end_idx] + insertion + content[end_idx:]
+                         else:
+                             print(f"Board {board_name} already in {target_array} in orig file? Skipping append.")
+                else:
+                    print(f"Warning: Could not find array {target_array} in hp-wmi.c")
+
         with open(target_file, "w") as f:
-            f.write(new_content)
+            f.write(content)
             
         return True, "Patch applied successfully."
 

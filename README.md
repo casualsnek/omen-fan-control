@@ -22,10 +22,32 @@ This program also includes a modification that sets the max speed according to c
 
 ## Installation
 
+### Clone the repository
+Clone the repository or download the latest source code from the [Releases](https://github.com/arfelious/omen-fan-control/releases) page.
+
+```bash
+git clone https://github.com/arfelious/omen-fan-control.git
+cd omen-fan-control
+```
+
 ### Dependencies
-Ensure you have kernel headers and base development tools installed.
-*   **Arch:** `pacman -S linux-headers base-devel python-click python-pyqt6`
-*   **Debian/Ubuntu:** `apt install linux-headers-$(uname -r) build-essential python3-click python3-pyqt6`
+
+**1. System Dependencies**
+You must install kernel headers and build tools for the driver patch to compile.
+*   **Arch:** `pacman -S linux-headers base-devel`
+*   **Debian/Ubuntu:** `apt install linux-headers-$(uname -r) build-essential`
+
+**2. Python Dependencies**
+You can install the required Python packages (`click`, `PyQt6`) via your package manager OR pip, preferably with a virtual environment.
+
+*   **Option A: Package Manager**
+    *   **Arch:** `pacman -S python-click python-pyqt6`
+    *   **Debian/Ubuntu:** `apt install python3-click python3-pyqt6`
+
+*   **Option B: Pip**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
 ### Install Driver Patch
 You can install the modified driver temporarily (current session) or permanently (DKMS-style patch).

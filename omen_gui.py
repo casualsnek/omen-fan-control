@@ -296,9 +296,10 @@ class MainWindow(QMainWindow):
                 self.controller.config["bypass_root_warning"] = True
                 self.controller.save_config()
 
-        if not self.controller.config.get("bypass_warning", False):
-            supported, board_name = self.controller.check_board_support()
-            if not supported:
+        if not self.controller.config.get("bypass_warning", False) or self.controller.config.get("debug_experimental_ui", False):
+            support_status, board_name = self.controller.check_board_support()
+            
+            if support_status == "UNSUPPORTED" and not self.controller.config.get("debug_experimental_ui", False):
                 msg = QMessageBox(self)
                 msg.setIcon(QMessageBox.Icon.Warning)
                 msg.setWindowTitle("Unsupported Device")
@@ -318,6 +319,44 @@ class MainWindow(QMainWindow):
                         self.controller.save_config()
                 else:
                     sys.exit(0)
+            
+            elif (support_status == "POSSIBLY_SUPPORTED" and not self.controller.config.get("enable_experimental", False)) or self.controller.config.get("debug_experimental_ui", False):
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Icon.Question)
+                msg.setWindowTitle("Experimental Support Available")
+                
+                text = (f"Your board ({board_name}) is not officially verified, but community patches suggest it uses the Omen thermal path.\n\n"
+                        "Enable Experimental List Support? This will attempt to load the kernel driver with Omen Thermal Profile. "
+                        "If your fans behave erratically or controls don't work, disable this in Settings.")
+                
+                msg.setText(text)
+                
+                enable_btn = msg.addButton("Enable Experimental List Support", QMessageBox.ButtonRole.YesRole)
+                msg.addButton("No", QMessageBox.ButtonRole.NoRole)
+                msg.setDefaultButton(enable_btn)
+                
+                chk = QCheckBox("Don't ask again")
+                msg.setCheckBox(chk)
+                
+                msg.exec()
+                
+                if msg.clickedButton() == enable_btn:
+                    self.controller.config["enable_experimental"] = True
+                    self.controller.config["thermal_profile"] = "omen"
+                    self.controller.save_config()
+                    QMessageBox.information(self, "Enabled", "Experimental support enabled.\nPlease go to 'Driver Management' to install/update the driver patch.")
+                    
+                    # Force update options page if it exists
+                    if hasattr(self, 'exp_check'):
+                         self.exp_check.setChecked(True)
+                         self.toggle_experimental_options(True)
+                
+                if chk.isChecked():
+                    self.controller.config["bypass_warning"] = True
+                    self.controller.save_config()
+                    
+                if self.controller.config.get("debug_experimental_ui"):
+                     print("Debug experimental UI shown.")
 
     def center_window(self):
         qr = self.frameGeometry()
@@ -753,6 +792,69 @@ class MainWindow(QMainWindow):
         self.bypass_root_check.setChecked(self.controller.config.get("bypass_root_warning", False))
         self.bypass_root_check.toggled.connect(self.save_options)
         form_grid.addWidget(self.bypass_root_check, 4, 0, 1, 2, alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+        # Experimental Support Section
+        exp_group = QWidget()
+        exp_layout = QVBoxLayout(exp_group)
+        exp_layout.setContentsMargins(0, 10, 0, 0)
+        
+        self.exp_check = QCheckBox("Enable Experimental List Support")
+        self.exp_check.setStyleSheet("color: #ff9800; font-weight: bold;")
+        self.exp_check.setChecked(self.controller.config.get("enable_experimental", False))
+        self.exp_check.toggled.connect(self.toggle_experimental_options)
+        
+        supp_status, _ = self.controller.check_board_support()
+        # Force POSSIBLY_SUPPORTED behavior for debugging
+        if self.controller.config.get("debug_experimental_ui"):
+            supp_status = "POSSIBLY_SUPPORTED"
+
+        if supp_status == "SUPPORTED":
+            self.exp_check.setEnabled(True)
+            self.exp_check.setToolTip("WARNING: Your board is already officially supported. <br>Forcing experimental mode override may cause conflicts or instability. This setting is not recommended for your board.")
+            self.exp_check.setStyleSheet("color: #ffa500;") # Orange warning color? Or keep standard? Let's leave clear warning style if possible, or just tooltip.
+            
+        elif supp_status == "UNSUPPORTED":
+             self.exp_check.setEnabled(False)
+             self.exp_check.setToolTip("Your motherboard id was not found on the experimental support list")
+             self.exp_check.setStyleSheet("color: #777;")
+
+        else: # POSSIBLY_SUPPORTED
+             self.exp_check.setEnabled(True)
+             self.exp_check.setToolTip("Enable support for unverified Omen/Victus boards")
+
+        exp_layout.addWidget(self.exp_check)
+        
+        self.exp_options_widget = QWidget()
+        exp_opt_layout = QHBoxLayout(self.exp_options_widget)
+        exp_opt_layout.setContentsMargins(20, 0, 0, 0)
+        
+        exp_opt_layout.addWidget(QLabel("Force Thermal Profile:"))
+        
+        self.profile_combo = QComboBox()
+        self.profile_combo.addItems(["Omen", "Victus", "Victus S"])
+        self.profile_combo.setItemDelegate(NoFocusDelegate())
+        
+        # Map config value to index
+        current_profile = self.controller.config.get("thermal_profile", "omen")
+        index = {"omen": 0, "victus": 1, "victus_s": 2}.get(current_profile, 0)
+        self.profile_combo.setCurrentIndex(index)
+        
+        exp_opt_layout.addWidget(self.profile_combo)
+        
+        self.exp_save_btn = QPushButton("Save")
+        self.exp_save_btn.setFixedWidth(60)
+        self.exp_save_btn.setStyleSheet("background-color: #2e7d32; padding: 5px;")
+        self.exp_save_btn.clicked.connect(self.save_options)
+        exp_opt_layout.addWidget(self.exp_save_btn)
+        
+        exp_opt_layout.addStretch()
+        
+        exp_layout.addWidget(self.exp_options_widget)
+        
+        form_grid.addWidget(exp_group, 5, 0, 1, 2)
+        
+        # Init visibility
+        self.toggle_experimental_options(self.exp_check.isChecked())
         
         layout.addWidget(form_widget, alignment=Qt.AlignmentFlag.AlignCenter)
         
@@ -1095,8 +1197,26 @@ class MainWindow(QMainWindow):
         self.controller.config['ma_window'] = self.ma_spin.value()
         self.controller.config['curve_interpolation'] = self.interp_combo.currentText().lower()
         self.controller.config['bypass_patch_warning'] = self.bypass_check.isChecked()
+        self.controller.config['bypass_root_warning'] = self.bypass_root_check.isChecked()
+        
+        # Experimental settings
+        self.controller.config['enable_experimental'] = self.exp_check.isChecked()
+        
+        profile_map = {0: "omen", 1: "victus", 2: "victus_s"}
+        self.controller.config['thermal_profile'] = profile_map.get(self.profile_combo.currentIndex(), "omen")
+
         self.temp_history_len = self.ma_spin.value()
         self.controller.save_config()
+        
+        # If save button was clicked on exp options, give feedback
+        sender = self.sender()
+        if sender == getattr(self, 'exp_save_btn', None):
+             self.status_label.setText("Settings saved.")
+             QTimer.singleShot(2000, self.check_driver_status)
+
+    def toggle_experimental_options(self, checked):
+        self.exp_options_widget.setVisible(checked)
+        self.save_options()
 
     def toggle_bios(self):
         is_currently_enabled = "Disable" in self.bios_btn.text()
