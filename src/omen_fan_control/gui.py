@@ -9,8 +9,9 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                             QProgressBar, QScrollArea, QSizePolicy, QListView, QTextEdit, QStyle, QStyledItemDelegate, QCheckBox)
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize, QPoint
 from PyQt6.QtGui import QFont, QIcon, QAction, QColor, QPainter, QBrush, QPen
-from omen_logic import FanController, OMEN_FAN_DIR
-from fan_curve_widget import FanCurveEditor
+from . import get_assets_dir, get_data_dir
+from .logic import FanController
+from .fan_curve_widget import FanCurveEditor
 
 class WorkerThread(QThread):
     finished = pyqtSignal(object)
@@ -190,7 +191,7 @@ class MainWindow(QMainWindow):
         self.resize(900, 600)
         
         # Set Window Icon
-        icon_path = OMEN_FAN_DIR / "assets" / "logo_test.png"
+        icon_path = get_assets_dir() / "logo_test.png"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
         
@@ -932,7 +933,7 @@ class MainWindow(QMainWindow):
         license_text.setReadOnly(True)
         
         try:
-            with open(OMEN_FAN_DIR / "LICENSE.md", "r") as f:
+            with open(get_data_dir() / "LICENSE.md", "r") as f:
                 content = f.read()
         except Exception as e:
             content = (f"This program is free software: you can redistribute it and/or modify\n"
@@ -1387,18 +1388,18 @@ class MainWindow(QMainWindow):
         self.rpm_timer.stop()
         event.accept()
 
-if __name__ == "__main__":
+def main():
     import signal
     signal.signal(signal.SIGINT, signal.SIG_DFL)
-    
     app = QApplication(sys.argv)
     app.setStyle("Windows")
-    
-    # Set App Icon
-    icon_path = OMEN_FAN_DIR / "assets" / "logo.png"
+    icon_path = get_assets_dir() / "logo.png"
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
-        
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()
