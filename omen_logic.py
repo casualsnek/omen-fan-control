@@ -398,7 +398,7 @@ class FanController:
                 elif profile == "victus_s":
                     target_array = "victus_s_thermal_profile_boards"
                            
-                start_idx = content.find(f"{target_array}[] = {{")
+                start_idx = content.find(f"{target_array}[]")
                 if start_idx != -1:
                     # Find closing brace after start_idx
                     end_idx = content.find("};", start_idx)
@@ -406,8 +406,10 @@ class FanController:
                          # Check if board is already in there
                          segment = content[start_idx:end_idx]
                          if f'"{board_name}"' not in segment:
-
-                             insertion = f'\t"{board_name}",\n'
+                             if target_array == "victus_s_thermal_profile_boards":
+                                 insertion = f'        {{\n            .matches = {{DMI_MATCH(DMI_BOARD_NAME, "{board_name}")}},\n            .driver_data = (void *)&victus_s_thermal_params,\n        }},\n'
+                             else:
+                                 insertion = f'    "{board_name}",\n'
                              content = content[:end_idx] + insertion + content[end_idx:]
                          else:
                              print(f"Board {board_name} already in {target_array} in orig file? Skipping append.")
@@ -635,6 +637,14 @@ WantedBy=multi-user.target
             return True, "Service removed."
         except Exception as e:
             return False, f"Failed to remove service: {e}"
+
+    def restart_service(self):
+        """Restarts the systemd service."""
+        try:
+            subprocess.run(["systemctl", "restart", "omen-fan-control.service"], check=True)
+            return True, "Service restarted."
+        except Exception as e:
+            return False, f"Failed to restart service: {e}"
 
     def is_service_installed(self):
         """Checks if service file exists."""

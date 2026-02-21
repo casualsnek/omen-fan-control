@@ -107,12 +107,15 @@ backup_drivers() {
     find "/lib/modules/$(uname -r)/kernel/drivers/platform/x86/hp" "/lib/modules/$(uname -r)/updates" -name "hp-wmi.ko*" 2>/dev/null | while read -r OLD_DRIVER; do
         if [[ "$OLD_DRIVER" == *"$SCRIPT_DIR"* ]]; then continue; fi
         
-        # Avoid double-backing up (skip .bak files)
+        # Avoid double-backing up (skip .bak files entirely)
         if [[ "$OLD_DRIVER" != *".bak" ]]; then
-            # If a backup doesn't exist, create one
-            if [ ! -f "$OLD_DRIVER.bak" ]; then
+            # Check if a .bak ALREADY exists for this driver path. 
+            # If so, do NOT backup again
+            if [ ! -f "${OLD_DRIVER}.bak" ]; then
                 echo "Backing up: $OLD_DRIVER"
-                sudo cp "$OLD_DRIVER" "$OLD_DRIVER.bak"
+                sudo cp "$OLD_DRIVER" "${OLD_DRIVER}.bak"
+            else
+                echo "Clean backup already exists for: $OLD_DRIVER (Skipping Backup)"
             fi
             
             # Important: Remove the conflicting module so depmod picks the new one
