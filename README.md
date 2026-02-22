@@ -125,9 +125,8 @@ sudo omen-fan-control-gui
 
 **GUI Fan Curve**
 
-
-|     |
-| --- |
+|<img width="400" height="300" alt="Omen Fan Control GUI" src="https://github.com/user-attachments/assets/57f1a966-d7a6-4c5f-8090-a1e947349bd9" />|
+|---|
 
 
 ### CLI
