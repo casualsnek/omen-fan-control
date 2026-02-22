@@ -15,8 +15,7 @@ source=("PKGBUILD")
 sha256sums=("SKIP")
 
 prepare() {
-  # Copy driver from repo
-
+  # Copy driver from repo (same layout as betel: dkms.conf + src/Makefile + src/hp-wmi-omen/)
   local reporoot
   if [[ -f "$startdir/src/omen_fan_control/data/driver/hp-wmi-omen/hp-wmi.c" ]]; then
     reporoot="$startdir"
@@ -25,7 +24,9 @@ prepare() {
   fi
   local driver="$reporoot/src/omen_fan_control/data/driver"
   cp -f "$driver/dkms.conf" "$srcdir/"
-  cp -dr --no-preserve=ownership "$driver/hp-wmi-omen" "$srcdir/"
+  mkdir -p "$srcdir/src"
+  cp -f "$driver/src/Makefile" "$srcdir/src/"
+  cp -dr --no-preserve=ownership "$driver/hp-wmi-omen" "$srcdir/src/"
 }
 
 package() {
@@ -34,5 +35,6 @@ package() {
   sed -e "s/@PKGNAME@/${_pkgbase}/g" \
       -e "s/@PKGVER@/${pkgver}/g" \
       -i "${pkgdir}${dkms_dir}/dkms.conf"
-  cp -dr --no-preserve=ownership "./hp-wmi-omen" "${pkgdir}${dkms_dir}/src"
+  install -Dm644 src/Makefile "${pkgdir}${dkms_dir}/src/Makefile"
+  cp -dr --no-preserve=ownership "./src/hp-wmi-omen" "${pkgdir}${dkms_dir}/src"
 }
