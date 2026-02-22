@@ -10,15 +10,19 @@ arch=("any")
 depends=("python-click" "python-pyqt6")
 makedepends=("python-build" "python-installer" "python-hatchling")
 optdepends=("hp-wmi-omen-dkms: persist patched driver across kernel updates")
-# One file so makepkg sets srcdir; prepare() copies rest from repo (run from repo root: makepkg -p arch/omen-fan-control/PKGBUILD)
-source=("../../pyproject.toml")
+source=("PKGBUILD")
 sha256sums=("SKIP")
 
 prepare() {
-  local repo_root
-  repo_root="$(cd "${startdir}/../.." && pwd)"
-  cp -f "$repo_root/README.md" "$repo_root/LICENSE.md" "$srcdir/" 2>/dev/null || true
-  cp -r "$repo_root/src" "$srcdir/"
+  local reporoot
+  if [[ -f "$startdir/pyproject.toml" ]]; then
+    reporoot="$startdir"
+  else
+    reporoot="$startdir/../.."
+  fi
+  cp -f "$reporoot/pyproject.toml" "$srcdir/"
+  cp -f "$reporoot/README.md" "$reporoot/LICENSE.md" "$srcdir/" 2>/dev/null || true
+  cp -r "$reporoot/src" "$srcdir/"
 }
 
 build() {
@@ -31,14 +35,13 @@ package() {
   whl=$(echo "$srcdir"/dist/omen_fan_control*.whl)
   python -m installer --compile-bytecode=0 -d "$pkgdir" "$whl"
 
-  # Driver data for "install-patch permanent" (OMEN_FAN_CONTROL_DIR used by app)
+  # Driver data for "install-patch permanent" (same layout as hp-wmi-omen-dkms: dkms.conf + hp-wmi-omen/)
+  local driver="$srcdir/src/omen_fan_control/data/driver"
+  install -Dm644 "$driver/dkms.conf" "$pkgdir/usr/share/omen-fan-control/driver/dkms.conf"
+  cp -dr --no-preserve=ownership "$driver/hp-wmi-omen" "$pkgdir/usr/share/omen-fan-control/driver/"
+  install -Dm755 "$driver/install_driver.sh" "$pkgdir/usr/share/omen-fan-control/driver/install_driver.sh"
   install -dm755 "$pkgdir/usr/share/omen-fan-control/driver/hooks"
-  install -Dm644 "$srcdir/src/omen_fan_control/data/driver/hp-wmi.c" "$pkgdir/usr/share/omen-fan-control/driver/hp-wmi.c"
-  install -Dm644 "$srcdir/src/omen_fan_control/data/driver/hp-wmi.c.orig" "$pkgdir/usr/share/omen-fan-control/driver/hp-wmi.c.orig"
-  install -Dm644 "$srcdir/src/omen_fan_control/data/driver/Makefile" "$pkgdir/usr/share/omen-fan-control/driver/Makefile"
-  install -Dm644 "$srcdir/src/omen_fan_control/data/driver/dkms.conf" "$pkgdir/usr/share/omen-fan-control/driver/dkms.conf"
-  install -Dm755 "$srcdir/src/omen_fan_control/data/driver/install_driver.sh" "$pkgdir/usr/share/omen-fan-control/driver/install_driver.sh"
-  for f in "$srcdir/src/omen_fan_control/data/driver/hooks/"*; do
+  for f in "$driver/hooks/"*; do
     [[ -f "$f" ]] && install -Dm644 "$f" "$pkgdir/usr/share/omen-fan-control/driver/hooks/$(basename "$f")"
   done
 

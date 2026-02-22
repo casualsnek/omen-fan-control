@@ -53,15 +53,15 @@ sudo omen-fan-control-gui
 
 Two packages: the **DKMS kernel module** (optional; persists across kernel updates) and the **Python app**.
 
-1. **Kernel module (DKMS)** – from repo:
+1. **Kernel module (DKMS)** – run from the package dir (makepkg needs PKGBUILD in cwd):
   ```bash
-   cd omen-fan-control/arch/hp-wmi-omen && makepkg -si
+  cd omen-fan-control/arch/hp-wmi-omen && makepkg -sf
+  sudo pacman -U hp-wmi-omen-dkms-*.pkg.tar.zst
   ```
-   This installs `hp-wmi-omen-dkms`. Alternatively, install the driver from the app (see Option C).
-2. **Python application** – from repo root:
+2. **Python application** – run from the package dir:
   ```bash
-   makepkg -p arch/omen-fan-control/PKGBUILD -sf
-   sudo pacman -U omen-fan-control-*.pkg.tar.zst
+  cd omen-fan-control/arch/omen-fan-control && makepkg -sf
+  sudo pacman -U omen-fan-control-*.pkg.tar.zst
   ```
    Driver data is installed under `/usr/share/omen-fan-control`; the app uses it when you run `install-patch permanent` (e.g. for calibration-based patching). Set `OMEN_FAN_CONTROL_DIR=/usr/share/omen-fan-control` if not using the provided `profile.d` snippet.
 
