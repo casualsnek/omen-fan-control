@@ -447,6 +447,15 @@ def remove_service_cmd():
     click.echo(msg)
 
 
+@service.command(name="restart")
+def restart_service_cmd():
+    """Restart the background service"""
+    controller = get_controller()
+    click.echo("Restarting background service...")
+    success, msg = controller.restart_service()
+    click.echo(msg)
+
+
 @service.command(name="status")
 def service_status_cmd():
     """Check service status"""

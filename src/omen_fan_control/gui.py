@@ -901,13 +901,11 @@ class MainWindow(QMainWindow):
              self.svc_btn.setStyleSheet("background-color: #2e7d32;")
              
         svc_layout.addWidget(self.svc_btn)
-        
         self.svc_restart_btn = QPushButton("Restart Service")
         self.svc_restart_btn.setFixedWidth(150)
         self.svc_restart_btn.setStyleSheet("background-color: #f57c00; color: white;")
         self.svc_restart_btn.clicked.connect(self.restart_service_request)
         self.svc_restart_btn.setVisible(self.controller.is_service_installed())
-        
         svc_layout.addWidget(self.svc_restart_btn)
         svc_layout.addStretch()
         
@@ -1048,17 +1046,6 @@ class MainWindow(QMainWindow):
         self.manual_unsaved_lbl.setVisible(False)
         self.curve_unsaved_lbl.setVisible(False)
         
-        self.manual_unsaved_lbl.setVisible(False)
-        self.curve_unsaved_lbl.setVisible(False)
-        
-        # If service is running, we just save config and let service handle it
-        if self.controller.is_service_running():
-            self.status_label.setText(f"Settings saved. Service will apply {mode} mode.")
-            # Ensure local loop is stopped
-            if hasattr(self, 'curve_timer'):
-                self.curve_timer.stop()
-            return
-
         if mode == "auto":
             self.controller.set_fan_mode("auto")
             self.status_label.setText("Set mode to Auto")
@@ -1086,11 +1073,6 @@ class MainWindow(QMainWindow):
             self.curve_timer = QTimer()
             self.curve_timer.timeout.connect(self.apply_curve_step)
         
-        # If service is running, do not run local loop
-        if self.controller.is_service_running():
-            self.curve_timer.stop()
-            return
-
         if self.mode_combo.currentText() == "Curve":
             self.curve_timer.start(2000)
         else:
@@ -1294,10 +1276,8 @@ class MainWindow(QMainWindow):
 
     def check_service_status(self):
         installed = self.controller.is_service_installed()
-        
-        if hasattr(self, 'svc_restart_btn'):
+        if hasattr(self, "svc_restart_btn"):
             self.svc_restart_btn.setVisible(installed)
-
         if not installed:
             self.svc_status_label.setText("Service: Not Installed")
             self.svc_status_label.setStyleSheet("color: #888;")
@@ -1305,17 +1285,14 @@ class MainWindow(QMainWindow):
             running = self.controller.is_service_running()
             if running:
                 self.svc_status_label.setText("Service: Active")
-                self.svc_status_label.setStyleSheet("color: #4caf50; font-weight: bold;") # Green
-                
-                # Stop local loop if service is running
-                if hasattr(self, 'curve_timer') and self.curve_timer.isActive():
-                    self.curve_timer.stop()
+                self.svc_status_label.setStyleSheet("color: #4caf50; font-weight: bold;")  # Green
             else:
                 self.svc_status_label.setText("Service: Inactive")
-                self.svc_status_label.setStyleSheet("color: #ff9800; font-weight: bold;") # Orange
-                
-                # Resume local loop if in Curve mode and service is not running
-                if self.mode_combo.currentText() == "Curve" and not (hasattr(self, 'curve_timer') and self.curve_timer.isActive()):
+                self.svc_status_label.setStyleSheet("color: #ff9800; font-weight: bold;")  # Orange
+                # Resume local curve loop if in Curve mode and timer not already active
+                if self.mode_combo.currentText() == "Curve" and not (
+                    hasattr(self, "curve_timer") and self.curve_timer.isActive()
+                ):
                     self.start_curve_loop()
 
     def restart_service_request(self):
@@ -1323,7 +1300,6 @@ class MainWindow(QMainWindow):
         self.svc_status_label.setStyleSheet("color: #ff9800; font-weight: bold;")
         self.svc_restart_btn.setEnabled(False)
         self.svc_btn.setEnabled(False)
-        
         self.restart_thread = WorkerThread(self.controller.restart_service)
         self.restart_thread.finished.connect(self.on_svc_restart_finished)
         self.restart_thread.start()
@@ -1333,12 +1309,12 @@ class MainWindow(QMainWindow):
         self.svc_btn.setEnabled(True)
         success, msg = result
         if success:
-             self.check_service_status()
-             QMessageBox.information(self, "Service", "Service successfully restarted.")
+            self.check_service_status()
+            QMessageBox.information(self, "Service", "Service successfully restarted.")
         else:
-             self.svc_status_label.setText("Restart Failed")
-             self.svc_status_label.setStyleSheet("color: #d63333; font-weight: bold;")
-             QMessageBox.critical(self, "Service Error", msg)
+            self.svc_status_label.setText("Restart Failed")
+            self.svc_status_label.setStyleSheet("color: #d63333; font-weight: bold;")
+            QMessageBox.critical(self, "Service Error", msg)
 
     def toggle_stress_test(self, checked):
         if checked:
