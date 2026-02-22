@@ -45,7 +45,14 @@ package() {
     [[ -f "$f" ]] && install -Dm644 "$f" "$pkgdir/usr/share/omen-fan-control/driver/hooks/$(basename "$f")"
   done
 
-  # systemd drop-in or profile.d so OMEN_FAN_CONTROL_DIR is set for all users
+  # systemd service (placeholder @EXECSTART@ replaced with installed executable path)
+  install -dm755 "$pkgdir/usr/lib/systemd/system"
+  sed 's|@EXECSTART@|/usr/bin/omen-fan-control serve|g' \
+    "$srcdir/src/omen_fan_control/data/omen-fan-control.service" \
+    > "$pkgdir/usr/lib/systemd/system/omen-fan-control.service"
+  chmod 644 "$pkgdir/usr/lib/systemd/system/omen-fan-control.service"
+
+  # profile.d so OMEN_FAN_CONTROL_DIR is set for all users
   install -dm755 "$pkgdir/etc/profile.d"
   printf '%s\n' 'export OMEN_FAN_CONTROL_DIR=/usr/share/omen-fan-control' > "$pkgdir/etc/profile.d/omen-fan-control.sh"
   chmod 644 "$pkgdir/etc/profile.d/omen-fan-control.sh"
