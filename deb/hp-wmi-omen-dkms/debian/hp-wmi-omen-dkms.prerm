@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+# On remove or upgrade, unregister from DKMS so the module is not built for new kernels
+if [ "$1" = "remove" ] || [ "$1" = "upgrade" ]; then
+  if command -v dkms >/dev/null 2>&1; then
+    dkms remove hp-wmi-omen/1.0 --all 2>/dev/null || true
+  fi
+fi
+
+exit 0
